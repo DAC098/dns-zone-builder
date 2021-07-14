@@ -1,4 +1,5 @@
 use crate::config;
+use crate::net::{IpAddrCidr};
 
 pub struct ConfigContext {
     file_path: std::path::PathBuf,
@@ -16,8 +17,8 @@ impl ConfigContext {
         }
     }
 
-    pub fn get_directory(&self) -> String {
-        self.directory.clone()
+    pub fn get_directory_ref(&self) -> &String {
+        &self.directory
     }
 
     pub fn find_key(&self, key: &String) -> Option<&String> {
@@ -28,9 +29,7 @@ impl ConfigContext {
 pub struct ZoneContext {
     name: String,
     domain: String,
-    reverse: bool,
-
-    reverse_type: Option<config::ReverseType>,
+    reverse_records: bool,
 
     ttl: usize,
 
@@ -43,8 +42,7 @@ impl ZoneContext {
         ZoneContext {
             name: zone.name.clone(),
             domain: format!("{}.", zone.domain.unwrap_or(zone.name)),
-            reverse_type: zone.reverse_type,
-            reverse: match zone.reverse {
+            reverse_records: match zone.reverse {
                 Some(which) => match which {
                     config::ReverseValue::Bool(rtn) => rtn,
                     config::ReverseValue::Str(_) => true
@@ -54,6 +52,10 @@ impl ZoneContext {
             ttl: zone.ttl.unwrap_or(604800),
             keys: zone.keys.unwrap_or(config::KeysMap::new())
         }
+    }
+
+    pub fn set_domain(&mut self, domain: String) -> () {
+        self.domain = domain;
     }
 
     pub fn get_domain(&self) -> String {
@@ -68,12 +70,8 @@ impl ZoneContext {
         }
     }
 
-    pub fn get_reverse_type(&self) -> Option<&config::ReverseType> {
-        self.reverse_type.as_ref()
-    }
-
     pub fn get_reverse(&self) -> bool {
-        self.reverse
+        self.reverse_records
     }
 
     pub fn get_ttl(&self) -> usize {

@@ -4,11 +4,8 @@ use crate::dns::record;
 
 pub struct Zone {
     name: String,
-    directory: String,
 
     origin: String,
-
-    ttl: usize,
 
     records: Vec<record::Record>
 }
@@ -16,14 +13,12 @@ pub struct Zone {
 impl Zone {
 
     pub fn new(
-        name: String, directory: String,
-        origin: String,
-        ttl: usize
+        name: String,
+        origin: String
     ) -> Zone {
         Zone {
-            name, directory,
+            name,
             origin,
-            ttl, 
             records: vec!()
         }
     }
@@ -36,12 +31,8 @@ impl Zone {
         self.name.clone()
     }
 
-    pub fn get_ttl(&self) -> usize {
-        self.ttl
-    }
-
-    pub fn get_directory(&self) -> String {
-        self.directory.clone()
+    pub fn get_origin_ref(&self) -> &String {
+        &self.origin
     }
 
     pub fn get_origin(&self) -> String {
@@ -57,7 +48,6 @@ impl fmt::Display for Zone {
 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut first: bool = true;
-        write!(f, "$TTL\t{}\n", self.ttl)?;
 
         for item in &self.records {
             if first {

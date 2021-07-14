@@ -8,6 +8,8 @@ pub type FmtResult<T> = Result<T, fmt::Error>;
 pub mod record;
 pub mod zone;
 
+use crate::net::{Ipv4AddrCidr, Ipv6AddrCidr, IpAddrCidr, ipv6_to_u128};
+
 fn reverse_string(string: &mut String) {
     unsafe {
         let vec = string.as_mut_vec();
@@ -32,7 +34,15 @@ pub fn ipv4_reverse_string(ipv4: &Ipv4Addr, include_suffix: bool) -> FmtResult<S
         write!(&mut rtn, ".in-addr.arpa.")?;
     }
 
-    rtn.shrink_to_fit();
+    Ok(rtn)
+}
+
+pub fn ipv4_reverse_prefix(ipv4: &Ipv4AddrCidr, include_suffix: bool) -> FmtResult<String> {
+    let mut rtn: String = String::new();
+
+    if include_suffix {
+        write!(&mut rtn, ".in-addr.arpa.")?;
+    }
 
     Ok(rtn)
 }
@@ -40,19 +50,39 @@ pub fn ipv4_reverse_string(ipv4: &Ipv4Addr, include_suffix: bool) -> FmtResult<S
 pub fn ipv6_reverse_string(ipv6: &Ipv6Addr, include_suffix: bool) -> FmtResult<String> {
     let mut rtn: String = String::with_capacity(if include_suffix { 73 } else { 63 });
     let mut first: bool = true;
-    let segments = ipv6.segments();
+    let mut hex_str: String = format!("{:0>32x}", ipv6_to_u128(ipv6));
+    reverse_string(&mut hex_str);
 
-    for index in (0..8).rev() {
-        let mut hex_str: String = format!("{:04x}", segments[index]);
-        reverse_string(&mut hex_str);
+    for c in hex_str.drain(..) {
+        if first {
+            write!(&mut rtn, "{}", c)?;
+            first = false;
+        } else {
+            write!(&mut rtn, ".{}", c)?;
+        }
+    }
 
-        for c in hex_str.drain(..) {
-            if first {
-                write!(&mut rtn, "{}", c)?;
-                first = false;
-            } else {
-                write!(&mut rtn, ".{}", c)?;
-            }
+    if include_suffix {
+        write!(&mut rtn, ".ip6.arpa.")?;
+    }
+
+    Ok(rtn)
+}
+
+pub fn ipv6_reverse_prefix(ipv6: &Ipv6AddrCidr, include_suffix: bool) -> FmtResult<String> {
+    let mut first = true;
+    let prefix_len = (*ipv6.cidr_ref() / 4) as usize;
+    let expected_len = prefix_len * 2 - 1;
+    let mut rtn = String::with_capacity(if include_suffix { expected_len + 10 } else { expected_len });
+    let mut hex_str: String = format!("{:0>32x}", ipv6.start_u128()).chars().take(prefix_len).collect();
+    reverse_string(&mut hex_str);
+
+    for c in hex_str.drain(..) {
+        if first {
+            write!(&mut rtn, "{}", c)?;
+            first = false;
+        } else {
+            write!(&mut rtn, ".{}", c)?;
         }
     }
 
@@ -70,11 +100,18 @@ pub fn ip_reverse_string(ip: &IpAddr, include_suffix: bool) -> FmtResult<String>
     }
 }
 
+pub fn ip_reverse_prefix(ip: &IpAddrCidr, include_suffix: bool) -> FmtResult<String> {
+    match ip {
+        IpAddrCidr::V4(v4) => ipv4_reverse_prefix(v4, include_suffix),
+        IpAddrCidr::V6(v6) => ipv6_reverse_prefix(v6, include_suffix)
+    }
+}
+
 pub struct ZoneStorage {
     zones: HashMap<String, zone::Zone>,
+    v4_reverse_zones: HashMap<String, Ipv4AddrCidr>,
+    v6_reverse_zones: HashMap<String, Ipv6AddrCidr>,
     current: Option<String>,
-    reverse_v4: Option<String>,
-    reverse_v6: Option<String>
 }
 
 impl ZoneStorage {
@@ -82,9 +119,9 @@ impl ZoneStorage {
     pub fn new() -> ZoneStorage {
         ZoneStorage {
             zones: HashMap::new(),
+            v4_reverse_zones: HashMap::new(),
+            v6_reverse_zones: HashMap::new(),
             current: None,
-            reverse_v4: None,
-            reverse_v6: None,
         }
     }
 
@@ -97,29 +134,33 @@ impl ZoneStorage {
         }
     }
 
-    pub fn set_rv4(&mut self, name: String) -> bool {
-        if self.zones.contains_key(&name) {
-            self.reverse_v4 = Some(name);
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn set_rv6(&mut self, name: String) -> bool {
-        if self.zones.contains_key(&name) {
-            self.reverse_v6 = Some(name);
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn add_zone(&mut self, zone: zone::Zone) -> bool {
         if self.zones.contains_key(zone.get_name_ref()) {
             false
         } else {
             self.current = Some(zone.get_name());
+            self.zones.insert(zone.get_name(), zone);
+            true
+        }
+    }
+
+    pub fn add_v4_rev_zone(&mut self, zone: zone::Zone, addr_cidr: Ipv4AddrCidr) -> bool {
+        if self.zones.contains_key(zone.get_name_ref()) {
+            false
+        } else {
+            self.current = Some(zone.get_name());
+            self.v4_reverse_zones.insert(zone.get_name(), addr_cidr);
+            self.zones.insert(zone.get_name(), zone);
+            true
+        }
+    }
+
+    pub fn add_v6_rev_zone(&mut self, zone: zone::Zone, addr_cidr: Ipv6AddrCidr) -> bool {
+        if self.zones.contains_key(zone.get_name_ref()) {
+            false
+        } else {
+            self.current = Some(zone.get_name());
+            self.v6_reverse_zones.insert(zone.get_name(), addr_cidr);
             self.zones.insert(zone.get_name(), zone);
             true
         }
@@ -137,32 +178,27 @@ impl ZoneStorage {
             false
         }
     }
-    
-    pub fn zone_add_record(&mut self, name: &String, record: record::Record) -> bool {
-        if let Some(zone) = self.zones.get_mut(name) {
-            zone.add_record(record);
-            true
-        } else {
-            false
+
+    pub fn add_v4_reverse_record(&mut self, addr: &Ipv4Addr, record: record::Record) -> bool {
+        for (name, ip_cidr) in self.v4_reverse_zones.iter() {
+            if ip_cidr.in_range(addr) {
+                self.zones.get_mut(name).unwrap().add_record(record);
+                return true;
+            }
         }
+
+        false
     }
 
-    pub fn rv4_add_record(&mut self, record: record::Record) -> bool {
-        if let Some(reverse_v4) = self.reverse_v4.as_ref() {
-            self.zones.get_mut(reverse_v4).unwrap().add_record(record);
-            true
-        } else {
-            false
+    pub fn add_v6_reverse_record(&mut self, addr: &Ipv6Addr, record: record::Record) -> bool {
+        for (name, ip_cidr) in self.v6_reverse_zones.iter() {
+            if ip_cidr.in_range(addr) {
+                self.zones.get_mut(name).unwrap().add_record(record);
+                return true;
+            }
         }
-    }
 
-    pub fn rv6_add_record(&mut self, record: record::Record) -> bool {
-        if let Some(reverse_v6) = self.reverse_v6.as_ref() {
-            self.zones.get_mut(reverse_v6).unwrap().add_record(record);
-            true
-        } else {
-            false
-        }
+        false
     }
 
     pub fn reserve(&mut self, additional: usize) {

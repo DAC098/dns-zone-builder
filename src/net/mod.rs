@@ -3,38 +3,14 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 pub mod error;
 
+#[inline]
 pub fn ipv4_to_u32(addr: &Ipv4Addr) -> u32 {
-    let mut rtn: u32 = 0;
-    let mut first = true;
-
-    for octet in addr.octets().iter() {
-        if !first {
-            rtn <<= 8;
-        } else {
-            first = false;
-        }
-
-        rtn |= *octet as u32;
-    }
-
-    rtn
+    u32::from_be_bytes(addr.octets())
 }
 
+#[inline]
 pub fn ipv6_to_u128(addr: &Ipv6Addr) -> u128 {
-    let mut rtn: u128 = 0;
-    let mut first = true;
-
-    for seg in addr.segments().iter() {
-        if !first {
-            rtn <<= 16;
-        } else {
-            first = false;
-        }
-
-        rtn |= *seg as u128;
-    }
-
-    rtn
+    u128::from_be_bytes(addr.octets())
 }
 
 pub struct Ipv4AddrCidr {
@@ -63,9 +39,7 @@ impl Ipv4AddrCidr {
         if Ipv4AddrCidr::check_cidr(&cidr) {
             Err(error::Error::InvalidV4Cidr(cidr))
         } else {
-            Ok(Ipv4AddrCidr {
-                addr, cidr
-            })
+            Ok(Ipv4AddrCidr {addr, cidr})
         }
     }
 
@@ -73,11 +47,11 @@ impl Ipv4AddrCidr {
         self.addr = addr;
     }
     
-    pub fn ref_addr(&self) -> &Ipv4Addr {
+    pub fn addr_ref(&self) -> &Ipv4Addr {
         &self.addr
     }
 
-    pub fn clone_addr(&self) -> Ipv4Addr {
+    pub fn addr_clone(&self) -> Ipv4Addr {
         self.addr.clone()
     }
 
@@ -90,11 +64,11 @@ impl Ipv4AddrCidr {
         }
     }
 
-    pub fn ref_cidr(&self) -> &u8 {
+    pub fn cidr_ref(&self) -> &u8 {
         &self.cidr
     }
 
-    pub fn clone_cidr(&self) -> u8 {
+    pub fn cidr_clone(&self) -> u8 {
         self.cidr
     }
 
@@ -102,18 +76,20 @@ impl Ipv4AddrCidr {
         2u32.pow(32 - (self.cidr as u32))
     }
 
-    fn start_u32(&self) -> u32 {
-        let avail = self.available_addresses();
-        ipv4_to_u32(&self.addr) & !(avail | (avail - 1))
+    pub fn as_u32(&self) -> u32 {
+        ipv4_to_u32(&self.addr)
+    }
+
+    pub fn start_u32(&self) -> u32 {
+        self.as_u32() & !(self.available_addresses() - 1)
     }
 
     pub fn start(&self) -> Ipv4Addr {
         Ipv4Addr::from(self.start_u32())
     }
 
-    fn finish_u32(&self) -> u32 {
-        let avail = self.available_addresses();
-        (ipv4_to_u32(&self.addr) & !(avail | (avail - 1))) + avail - 1
+    pub fn finish_u32(&self) -> u32 {
+        self.as_u32() | (self.available_addresses() - 1)
     }
 
     pub fn finish(&self) -> Ipv4Addr {
@@ -123,10 +99,14 @@ impl Ipv4AddrCidr {
     pub fn in_range(&self, check: &Ipv4Addr) -> bool {
         let avail = self.available_addresses();
         let check_value = ipv4_to_u32(check);
-        let start = ipv4_to_u32(&self.addr) & !(avail | (avail - 1));
-        let finish = start + avail - 1;
+        let start = self.as_u32() & !(avail - 1);
+        let finish = start | (avail - 1);
 
         check_value >= start && check_value <= finish
+    }
+
+    pub fn prefix(&self) -> String {
+        format!("{}/{}", self.start(), self.cidr)
     }
 }
 
@@ -138,7 +118,7 @@ impl fmt::Display for Ipv4AddrCidr {
     
 }
 
-struct Ipv6AddrCidr {
+pub struct Ipv6AddrCidr {
     addr: Ipv6Addr,
     cidr: u8
 }
@@ -164,17 +144,15 @@ impl Ipv6AddrCidr {
         if Ipv6AddrCidr::check_cidr(&cidr) {
             Err(error::Error::InvalidV6Cidr(cidr))
         } else {
-            Ok(Ipv6AddrCidr {
-                addr, cidr
-            })
+            Ok(Ipv6AddrCidr {addr, cidr})
         }
     }
 
-    pub fn ref_addr(&self) -> &Ipv6Addr {
+    pub fn addr_ref(&self) -> &Ipv6Addr {
         &self.addr
     }
 
-    pub fn clone_addr(&self) -> Ipv6Addr {
+    pub fn addr_clone(&self) -> Ipv6Addr {
         self.addr.clone()
     }
 
@@ -187,11 +165,11 @@ impl Ipv6AddrCidr {
         }
     }
 
-    pub fn ref_cidr(&self) -> &u8 {
+    pub fn cidr_ref(&self) -> &u8 {
         &self.cidr
     }
 
-    pub fn clone_cidr(&self) -> u8 {
+    pub fn cidr_clone(&self) -> u8 {
         self.cidr
     }
 
@@ -199,9 +177,12 @@ impl Ipv6AddrCidr {
         2u128.pow(128 - (self.cidr as u32))
     }
 
+    pub fn as_u128(&self) -> u128 {
+        ipv6_to_u128(&self.addr)
+    }
+
     pub fn start_u128(&self) -> u128 {
-        let avail = self.available_addresses();
-        ipv6_to_u128(&self.addr) & !(avail | (avail - 1))
+        self.as_u128() & !(self.available_addresses() - 1)
     }
 
     pub fn start(&self) -> Ipv6Addr {
@@ -209,8 +190,7 @@ impl Ipv6AddrCidr {
     }
 
     pub fn finish_u128(&self) -> u128 {
-        let avail = self.available_addresses();
-        (ipv6_to_u128(&self.addr) & !(avail | (avail - 1))) + avail - 1
+        self.as_u128() | (self.available_addresses() - 1)
     }
 
     pub fn finish(&self) -> Ipv6Addr {
@@ -220,10 +200,14 @@ impl Ipv6AddrCidr {
     pub fn in_range(&self, check: &Ipv6Addr) -> bool {
         let avail = self.available_addresses();
         let check_value = ipv6_to_u128(check);
-        let start = ipv6_to_u128(&self.addr) & !(avail | (avail - 1));
-        let finish = start + avail - 1;
+        let start = self.as_u128() & !(avail - 1);
+        let finish = start | (avail - 1);
 
         check_value >= start && check_value <= finish
+    }
+
+    pub fn prefix(&self) -> String {
+        format!("{}/{}", self.start(), self.cidr)
     }
 }
 

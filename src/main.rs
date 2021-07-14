@@ -30,7 +30,55 @@ fn main() {
     });
 }
 
+fn v4_test() {
+    let test = net::Ipv4AddrCidr::new(154, 40, 43, 205, 32).unwrap();
+    let avail = test.available_addresses();
+    let addr = test.as_u32();
+    let start = test.start_u32();
+    let finish = test.finish_u32();
+    println!("{}", test);
+    println!("  prefix: {}", test.prefix());
+    println!("  addr  : {}", test.addr_ref());
+    println!("  cidr  : {}", test.cidr_ref());
+    println!("  avail : {}", avail);
+    println!("  start : {}", test.start());
+    println!("  finish: {}", test.finish());
+    println!("  cidr_mask : {:0>32b}", avail - 1);
+    println!("  addr_bin  : {:0>32b}", addr);
+    println!("  start_bin : {:0>32b}", start);
+    println!("  finish_bin: {:0>32b}", finish);
+    println!("  addr_hex  : {:0>8x}", addr);
+    println!("  start_hex : {:0>8x}", start);
+    println!("  finish_hex: {:0>8x}", finish);
+}
+
+fn v6_test() {
+    let test = net::Ipv6AddrCidr::new(0x28e4, 0xd3e8, 0x6ca1, 0x6c21, 0x14f6, 0xc4a8,0x20a0, 0xc409, 48).unwrap();
+    let avail = test.available_addresses();
+    let addr = test.as_u128();
+    let start = test.start_u128();
+    let finish = test.finish_u128();
+    println!("{}", test);
+    println!("  prefix: {}", test.prefix());
+    println!("  addr  : {}", test.addr_ref());
+    println!("  cidr  : {} {}", test.cidr_ref(), *test.cidr_ref() / 4);
+    println!("  avail : {}", avail);
+    println!("  start : {}", test.start());
+    println!("  finish: {}", test.finish());
+    println!("  cidr_mask : {:0>128b}", avail - 1);
+    println!("  addr_bin  : {:0>128b}", addr);
+    println!("  start_bin : {:0>128b}", start);
+    println!("  finish_bin: {:0>128b}", finish);
+    println!("  addr_hex  : {:0>32x}", addr);
+    println!("  start_hex : {:0>32x}", start);
+    println!("  finish_hex: {:0>32x}", finish);
+    println!("  prefix_dns: {}", dns::ipv6_reverse_prefix(&test, true).unwrap());
+}
+
 fn app_runner() -> error::Result<i32> {
+    v4_test();
+    v6_test();
+
     let mut files: Vec<std::path::PathBuf> = vec!();
     let mut args = std::env::args();
     args.next();
@@ -58,59 +106,97 @@ fn app_runner() -> error::Result<i32> {
 
         // first pass
         for mut zone in zones {
+            let reverse_zone_info = std::mem::take(&mut zone.reverse_zone);
             let subdomains = std::mem::take(&mut zone.subdomains);
-            let zone_context = context::ZoneContext::new(zone);
+            let mut zone_context = context::ZoneContext::new(zone);
 
             if new_zones.has_zone(zone_context.get_name_ref()) {
                 println!("duplicate zone name encountered. name: \"{}\"", zone_context.get_name_ref());
                 continue;
             }
 
-            new_zones.add_zone(dns::zone::Zone::new(
-                zone_context.get_name(),
-                conf_context.get_directory(),
-                zone_context.get_domain(),
-                zone_context.get_ttl()
-            ));
-            
-            if let Some(t) = zone_context.get_reverse_type() {
-                match t {
+            if let Some(info) = reverse_zone_info {
+                match info.r#type {
                     config::ReverseType::V4 => {
-                        new_zones.set_rv4(zone_context.get_name());
+                        let addr_cidr = net::Ipv4AddrCidr::from_addr(
+                            info.addr.parse::<std::net::Ipv4Addr>().map_err(|_| error::RuntimeError::Error(
+                                format!("given ipv4 is invalid for reverse zone. given: {}", info.addr)
+                            ))?,
+                            info.cidr
+                        ).map_err(|e| error::RuntimeError::Error(
+                            e.get_msg()
+                        ))?;
+
+                        zone_context.set_domain(dns::ipv4_reverse_prefix(&addr_cidr, true)?);
+
+                        new_zones.add_v4_rev_zone(
+                            dns::zone::Zone::new(
+                                zone_context.get_name(),
+                                zone_context.get_domain()
+                            ),
+                            addr_cidr
+                        );
                     },
                     config::ReverseType::V6 => {
-                        new_zones.set_rv6(zone_context.get_name());
+                        let addr_cidr = net::Ipv6AddrCidr::from_addr(
+                            info.addr.parse::<std::net::Ipv6Addr>().map_err(|_| error::RuntimeError::Error(
+                                format!("given ipv6 is invalid for reverse zone. given: {}", info.addr)
+                            ))?,
+                            info.cidr
+                        ).map_err(|e| error::RuntimeError::Error(
+                            e.get_msg()
+                        ))?;
+
+                        zone_context.set_domain(dns::ipv6_reverse_prefix(&addr_cidr, true)?);
+
+                        new_zones.add_v6_rev_zone(
+                            dns::zone::Zone::new(
+                                zone_context.get_name(),
+                                zone_context.get_domain()
+                            ),
+                            addr_cidr
+                        );
                     }
                 }
+            } else {
+                new_zones.add_zone(dns::zone::Zone::new(
+                    zone_context.get_name(),
+                    zone_context.get_domain()
+                ));
             }
 
             pre_builts.push((zone_context.get_name(), zone_context, subdomains));
         }
 
         for (name, zone_context, subdomains) in pre_builts {
+            let mut first = true;
             new_zones.set_current(name);
 
             for mut subdomain in subdomains {
+                if !first {
+                    new_zones.add_record(dns::record::Record::Blank);
+                } else {
+                    first = false;
+                }
+
                 let records = std::mem::take(&mut subdomain.records);
                 let subdomain_contex = context::SubDomainContext::new(&zone_context, subdomain);
 
                 for record in records {
                     parse_record(&mut new_zones, &conf_context, &zone_context, &subdomain_contex, record)?;
                 }
-
-                new_zones.add_record(dns::record::Record::Blank);
             }
         }
 
         for (_, zone) in new_zones.into_inner() {
             println!("handling zone: {}", zone.get_name());
             let mut path = std::path::PathBuf::new();
-            path.push(zone.get_directory());
-            path.push(zone.get_name());
+            path.push(conf_context.get_directory_ref().as_str());
+            path.push(zone.get_name_ref().as_str());
 
             let mut tmp_path = std::path::PathBuf::new();
             tmp_path.push("/tmp");
-            tmp_path.push(zone.get_name());
+            tmp_path.push(zone.get_name_ref().as_str());
             let mut tmp_file = std::fs::File::create(tmp_path.as_path())?;
 
             write!(tmp_file, "; ------------------------------------------------------------------------------\n")?;
@@ -119,7 +205,7 @@ fn app_runner() -> error::Result<i32> {
             write!(tmp_file, "{}\n", zone)?;
 
             let cmd = std::process::Command::new("named-checkzone")
-                .arg(zone.get_origin())
+                .arg(zone.get_origin_ref().as_str())
                 .arg(tmp_path.as_path())
                 .output()?;
 
@@ -292,14 +378,12 @@ fn parse_ipv4_type(
     };
 
     if reverse {
-        if !dns_zone.rv4_add_record(dns::record::Record::Ptr {
+        if !dns_zone.add_v4_reverse_record(&ip, dns::record::Record::Ptr {
             name: dns::ipv4_reverse_string(&ip, true)?,
             ttl: zone.get_ttl(),
             domain: subdomain.get_domain()
         }) {
-            return Err(error::RuntimeError::Error(
-                format!("failed to add record to requested zone file")
-            ));
+            println!("failed to find reverse zone for ip address: {}", ip);
         }
     }
 
@@ -374,14 +458,12 @@ fn parse_ipv6_type(
     };
 
     if reverse {
-        if !dns_zone.rv6_add_record(dns::record::Record::Ptr {
+        if !dns_zone.add_v6_reverse_record(&ip, dns::record::Record::Ptr {
             name: dns::ipv6_reverse_string(&ip, true)?,
             ttl: zone.get_ttl(),
             domain: subdomain.get_domain()
         }) {
-            return Err(error::RuntimeError::Error(
-                format!("failed to add record to requested zone file")
-            ));
+            println!("failed to find reverse zone for ip address: {}", ip);
         }
     }
 

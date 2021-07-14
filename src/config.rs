@@ -154,11 +154,19 @@ pub enum ReverseType {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct ReverseZone {
+    pub r#type: ReverseType,
+    pub addr: String,
+    pub cidr: u8,
+    pub as_domain: Option<bool>
+}
+
+#[derive(Deserialize, Debug)]
 pub struct Zone {
     pub name: String,
     pub domain: DomainName,
 
-    pub reverse_type: Option<ReverseType>,
+    pub reverse_zone: Option<ReverseZone>,
 
     pub ttl: Option<usize>,
     pub reverse: Option<ReverseValue>,
