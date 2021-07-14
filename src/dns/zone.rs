@@ -36,6 +36,10 @@ impl Zone {
         self.name.clone()
     }
 
+    pub fn get_ttl(&self) -> usize {
+        self.ttl
+    }
+
     pub fn get_directory(&self) -> String {
         self.directory.clone()
     }

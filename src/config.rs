@@ -99,11 +99,11 @@ pub enum Record {
         domain: String,
         email: String,
 
-        serial: i32,
-        refresh: i32,
-        retry: i32,
-        expire: i32,
-        nct: i32
+        serial: u32,
+        refresh: u32,
+        retry: u32,
+        expire: u32,
+        nct: u32
     },
 
     Ns {

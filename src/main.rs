@@ -181,6 +181,7 @@ fn parse_record(
         } => {
             dns_zone.add_record(dns::record::Record::Soa {
                 name: subdomain.get_domain(),
+                ttl: zone.get_ttl(),
                 domain: zone.with_domain(domain), 
                 email: zone.with_domain(email),
                 serial, refresh, 
@@ -190,6 +191,7 @@ fn parse_record(
         config::Record::Ns {domain} => {
             dns_zone.add_record(dns::record::Record::Ns {
                 name: subdomain.get_domain(),
+                ttl: zone.get_ttl(),
                 domain: zone.with_domain(domain)
             });
         },
@@ -232,6 +234,7 @@ fn parse_record(
         config::Record::Mx {priority, domain} => {
             dns_zone.add_record(dns::record::Record::Mx {
                 name: subdomain.get_domain(),
+                ttl: zone.get_ttl(),
                 priority,
                 domain: zone.with_domain(domain)
             });
@@ -239,12 +242,14 @@ fn parse_record(
         config::Record::Cname {alias} => {
             dns_zone.add_record(dns::record::Record::Cname {
                 name: subdomain.get_domain(),
+                ttl: zone.get_ttl(),
                 alias: zone.with_domain(alias)
             });
         },
         config::Record::Txt {value} => {
             dns_zone.add_record(dns::record::Record::Txt {
                 name: subdomain.get_domain(),
+                ttl: zone.get_ttl(),
                 value
             });
         },
@@ -289,6 +294,7 @@ fn parse_ipv4_type(
     if reverse {
         if !dns_zone.rv4_add_record(dns::record::Record::Ptr {
             name: dns::ipv4_reverse_string(&ip, true)?,
+            ttl: zone.get_ttl(),
             domain: subdomain.get_domain()
         }) {
             return Err(error::RuntimeError::Error(
@@ -299,6 +305,7 @@ fn parse_ipv4_type(
 
     dns_zone.add_record(dns::record::Record::A {
         name: subdomain.get_domain(),
+        ttl: zone.get_ttl(),
         address: ip
     });
 
@@ -369,6 +376,7 @@ fn parse_ipv6_type(
     if reverse {
         if !dns_zone.rv6_add_record(dns::record::Record::Ptr {
             name: dns::ipv6_reverse_string(&ip, true)?,
+            ttl: zone.get_ttl(),
             domain: subdomain.get_domain()
         }) {
             return Err(error::RuntimeError::Error(
@@ -379,6 +387,7 @@ fn parse_ipv6_type(
 
     dns_zone.add_record(dns::record::Record::Aaaa {
         name: subdomain.get_domain(),
+        ttl: zone.get_ttl(),
         address: ip
     });
 
@@ -415,6 +424,7 @@ fn parse_ptr_value(
 
     dns_zone.add_record(dns::record::Record::Ptr {
         name: dns::ip_reverse_string(&ip, true)?,
+        ttl: zone.get_ttl(),
         domain: subdomain.get_domain()
     });
 

@@ -7,50 +7,58 @@ pub enum Record {
     Soa {
         name: RecordName,
 
+        ttl: usize,
+
         domain: String,
         email: String,
 
-        serial: i32,
-        refresh: i32,
-        retry: i32,
-        expire: i32,
-        nct: i32
+        serial: u32,
+        refresh: u32,
+        retry: u32,
+        expire: u32,
+        nct: u32
     },
 
     Ns {
         name: RecordName,
+        ttl: usize,
         domain: String
     },
 
     A {
         name: RecordName,
+        ttl: usize,
         address: Ipv4Addr
     },
 
     Aaaa {
         name: RecordName,
+        ttl: usize,
         address: Ipv6Addr
     },
 
     Mx {
         name: RecordName,
+        ttl: usize,
         priority: usize,
         domain: String
     },
 
     Cname {
         name: RecordName,
+        ttl: usize,
         alias: String
     },
 
     Txt {
         name: RecordName,
+        ttl: usize,
         value: String
     },
 
     Ptr {
         name: String,
-
+        ttl: usize,
         domain: String
     },
 
@@ -61,30 +69,30 @@ impl fmt::Display for Record {
 
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &*self {
-            Record::Soa {name, domain, email, serial, refresh, retry, expire, nct} =>
-                write!(f, "{name}\tIN\tSOA\t{domain}\t{email} ( \
+            Record::Soa {name, ttl, domain, email, serial, refresh, retry, expire, nct} =>
+                write!(f, "{name}\t{ttl}\tIN\tSOA\t{domain}\t{email} ( \
                          {serial} \
                          {refresh} \
                          {retry} \
                          {expire} \
                          {nct} )",
-                    name=name, domain=domain, email=email,
+                    name=name, ttl=ttl, domain=domain, email=email,
                     serial=serial, refresh=refresh, retry=retry, expire=expire, nct=nct
                 ),
-            Record::Ns {name, domain} => 
-                write!(f, "{name}\tIN\tNS\t{domain}", name=name, domain=domain),
-            Record::A {name, address} =>
-                write!(f, "{name}\tIN\tA\t{address}", name=name, address=address),
-            Record::Aaaa {name, address} =>
-                write!(f, "{name}\tIN\tAAAA\t{address}", name=name, address=address),
-            Record::Mx {name, priority, domain} =>
-                write!(f, "{name}\tIN\tMX\t{priority}\t{domain}", name=name, priority=priority, domain=domain),
-            Record::Cname {name, alias} =>
-                write!(f, "{name}\tIN\tCNAME\t{alias}", name=name, alias=alias),
-            Record::Txt {name, value} =>
-                write!(f, "{name}\tIN\tTXT\t{value}", name=name, value=value),
-            Record::Ptr {name, domain} =>
-                write!(f, "{name}\tIN\tPTR\t{domain}", name=name, domain=domain),
+            Record::Ns {name, ttl, domain} => 
+                write!(f, "{name}\t{ttl}\tIN\tNS\t{domain}", name=name, ttl=ttl, domain=domain),
+            Record::A {name, ttl, address} =>
+                write!(f, "{name}\t{ttl}\tIN\tA\t{address}", name=name, ttl=ttl, address=address),
+            Record::Aaaa {name, ttl, address} =>
+                write!(f, "{name}\t{ttl}\tIN\tAAAA\t{address}", name=name, ttl=ttl, address=address),
+            Record::Mx {name, ttl, priority, domain} =>
+                write!(f, "{name}\t{ttl}\tIN\tMX\t{priority}\t{domain}", name=name, ttl=ttl, priority=priority, domain=domain),
+            Record::Cname {name, ttl, alias} =>
+                write!(f, "{name}\t{ttl}\tIN\tCNAME\t{alias}", name=name, ttl=ttl, alias=alias),
+            Record::Txt {name, ttl, value} =>
+                write!(f, "{name}\t{ttl}\tIN\tTXT\t{value}", name=name, ttl=ttl, value=value),
+            Record::Ptr {name, ttl, domain} =>
+                write!(f, "{name}\t{ttl}\tIN\tPTR\t{domain}", name=name, ttl=ttl, domain=domain),
             Record::Blank =>
                 write!(f, "")
         }
