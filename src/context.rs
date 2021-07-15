@@ -1,17 +1,14 @@
 use crate::config;
-use crate::net::{IpAddrCidr};
 
 pub struct ConfigContext {
-    file_path: std::path::PathBuf,
     directory: String,
     keys: config::KeysMap
 }
 
 impl ConfigContext {
 
-    pub fn new(file_path: std::path::PathBuf, config: config::Config) -> ConfigContext {
+    pub fn new(config: config::Config) -> ConfigContext {
         ConfigContext {
-            file_path,
             directory: config.directory.unwrap_or("".to_owned()),
             keys: config.keys.unwrap_or(config::KeysMap::new())
         }
@@ -92,7 +89,6 @@ impl ZoneContext {
 }
 
 pub struct SubDomainContext {
-    name: String,
     domain: String,
     reverse: bool,
 }
@@ -111,7 +107,6 @@ impl SubDomainContext {
         }
         
         SubDomainContext {
-            name: subdomain.name,
             domain,
             reverse: match subdomain.reverse {
                 Some(which) => match which {

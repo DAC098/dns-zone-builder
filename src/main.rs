@@ -3,6 +3,7 @@ use std::io::prelude::*;
 use lazy_static::lazy_static;
 use regex::{Regex};
 
+mod bits;
 mod error;
 mod net;
 mod dns;
@@ -30,8 +31,9 @@ fn main() {
     });
 }
 
+#[allow(dead_code)]
 fn v4_test() {
-    let test = net::Ipv4AddrCidr::new(154, 40, 43, 205, 32).unwrap();
+    let test = net::Ipv4AddrCidr::new(154, 40, 43, 205, 8).unwrap();
     let avail = test.available_addresses();
     let addr = test.as_u32();
     let start = test.start_u32();
@@ -39,7 +41,7 @@ fn v4_test() {
     println!("{}", test);
     println!("  prefix: {}", test.prefix());
     println!("  addr  : {}", test.addr_ref());
-    println!("  cidr  : {}", test.cidr_ref());
+    println!("  cidr  : {} {}", test.cidr_ref(), *test.cidr_ref() / 8);
     println!("  avail : {}", avail);
     println!("  start : {}", test.start());
     println!("  finish: {}", test.finish());
@@ -50,8 +52,10 @@ fn v4_test() {
     println!("  addr_hex  : {:0>8x}", addr);
     println!("  start_hex : {:0>8x}", start);
     println!("  finish_hex: {:0>8x}", finish);
+    println!("  prefix_dns: {}", dns::ipv4_reverse_prefix(&test, true).unwrap());
 }
 
+#[allow(dead_code)]
 fn v6_test() {
     let test = net::Ipv6AddrCidr::new(0x28e4, 0xd3e8, 0x6ca1, 0x6c21, 0x14f6, 0xc4a8,0x20a0, 0xc409, 48).unwrap();
     let avail = test.available_addresses();
@@ -76,9 +80,6 @@ fn v6_test() {
 }
 
 fn app_runner() -> error::Result<i32> {
-    v4_test();
-    v6_test();
-
     let mut files: Vec<std::path::PathBuf> = vec!();
     let mut args = std::env::args();
     args.next();
@@ -100,7 +101,7 @@ fn app_runner() -> error::Result<i32> {
         let mut conf = load_file(file.clone())?;
         let mut pre_builts: Vec<ZonePreBuilt> = Vec::with_capacity(conf.zones.len());
         let zones = std::mem::take(&mut conf.zones);
-        let conf_context = context::ConfigContext::new(file, conf);
+        let conf_context = context::ConfigContext::new(conf);
 
         new_zones.reserve(zones.len());
 
@@ -210,6 +211,7 @@ fn app_runner() -> error::Result<i32> {
                 .output()?;
 
             if cmd.status.code().unwrap() != 0 {
+                std::io::stdout().write_all(&cmd.stdout).unwrap();
                 std::io::stderr().write_all(&cmd.stderr).unwrap();
                 std::fs::remove_file(tmp_path.as_path())?;
             } else {

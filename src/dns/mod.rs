@@ -8,7 +8,7 @@ pub type FmtResult<T> = Result<T, fmt::Error>;
 pub mod record;
 pub mod zone;
 
-use crate::net::{Ipv4AddrCidr, Ipv6AddrCidr, IpAddrCidr, ipv6_to_u128};
+use crate::net::{Ipv4AddrCidr, Ipv6AddrCidr, ipv6_to_u128};
 
 fn reverse_string(string: &mut String) {
     unsafe {
@@ -34,11 +34,25 @@ pub fn ipv4_reverse_string(ipv4: &Ipv4Addr, include_suffix: bool) -> FmtResult<S
         write!(&mut rtn, ".in-addr.arpa.")?;
     }
 
+    rtn.shrink_to_fit();
+
     Ok(rtn)
 }
 
 pub fn ipv4_reverse_prefix(ipv4: &Ipv4AddrCidr, include_suffix: bool) -> FmtResult<String> {
-    let mut rtn: String = String::new();
+    let mut first = true;
+    let prefix_len = (*ipv4.cidr_ref() / 8) as usize;
+    let expected_len = prefix_len * 3 + prefix_len - 1;
+    let mut rtn: String = String::with_capacity(if include_suffix { expected_len +  14} else { expected_len });
+
+    for octet in ipv4.addr_ref().octets().iter().take(prefix_len).rev() {
+        if first {
+            write!(&mut rtn, "{}", octet)?;
+            first = false;
+        } else {
+            write!(&mut rtn, ".{}", octet)?;
+        }
+    }
 
     if include_suffix {
         write!(&mut rtn, ".in-addr.arpa.")?;
@@ -97,13 +111,6 @@ pub fn ip_reverse_string(ip: &IpAddr, include_suffix: bool) -> FmtResult<String>
     match ip {
         IpAddr::V4(v4) => ipv4_reverse_string(v4, include_suffix),
         IpAddr::V6(v6) => ipv6_reverse_string(v6, include_suffix)
-    }
-}
-
-pub fn ip_reverse_prefix(ip: &IpAddrCidr, include_suffix: bool) -> FmtResult<String> {
-    match ip {
-        IpAddrCidr::V4(v4) => ipv4_reverse_prefix(v4, include_suffix),
-        IpAddrCidr::V6(v6) => ipv6_reverse_prefix(v6, include_suffix)
     }
 }
 

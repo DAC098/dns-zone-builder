@@ -3,6 +3,8 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 pub mod error;
 
+use crate::bits;
+
 #[inline]
 pub fn ipv4_to_u32(addr: &Ipv4Addr) -> u32 {
     u32::from_be_bytes(addr.octets())
@@ -81,7 +83,9 @@ impl Ipv4AddrCidr {
     }
 
     pub fn start_u32(&self) -> u32 {
-        self.as_u32() & !(self.available_addresses() - 1)
+        let mut rtn = self.as_u32();
+        bits::flip_off_right_u32(&mut rtn, 32 - self.cidr);
+        rtn
     }
 
     pub fn start(&self) -> Ipv4Addr {
@@ -89,7 +93,9 @@ impl Ipv4AddrCidr {
     }
 
     pub fn finish_u32(&self) -> u32 {
-        self.as_u32() | (self.available_addresses() - 1)
+        let mut rtn = self.as_u32();
+        bits::flip_on_right_u32(&mut rtn, 32 - self.cidr);
+        rtn
     }
 
     pub fn finish(&self) -> Ipv4Addr {
@@ -182,7 +188,9 @@ impl Ipv6AddrCidr {
     }
 
     pub fn start_u128(&self) -> u128 {
-        self.as_u128() & !(self.available_addresses() - 1)
+        let mut rtn = self.as_u128();
+        bits::flip_off_right_u128(&mut rtn, 128 - self.cidr);
+        rtn
     }
 
     pub fn start(&self) -> Ipv6Addr {
@@ -190,7 +198,9 @@ impl Ipv6AddrCidr {
     }
 
     pub fn finish_u128(&self) -> u128 {
-        self.as_u128() | (self.available_addresses() - 1)
+        let mut rtn = self.as_u128();
+        bits::flip_on_right_u128(&mut rtn, 128 - self.cidr);
+        rtn
     }
 
     pub fn finish(&self) -> Ipv6Addr {
@@ -217,27 +227,4 @@ impl fmt::Display for Ipv6AddrCidr {
         write!(f, "{}/{}", self.addr, self.cidr)
     }
     
-}
-
-pub enum IpAddrCidr {
-    V4(Ipv4AddrCidr),
-    V6(Ipv6AddrCidr)
-}
-
-impl IpAddrCidr {
-
-    pub fn is_ipv4(&self) -> bool {
-        match self {
-            IpAddrCidr::V4(_) => true,
-            IpAddrCidr::V6(_) => false
-        }
-    }
-
-    pub fn is_ipv6(&self) -> bool {
-        match self {
-            IpAddrCidr::V4(_) => false,
-            IpAddrCidr::V6(_) => true,
-        }
-    }
-
 }

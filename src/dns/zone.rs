@@ -35,10 +35,6 @@ impl Zone {
         &self.origin
     }
 
-    pub fn get_origin(&self) -> String {
-        self.origin.clone()
-    }
-
     pub fn add_record(&mut self, record: record::Record) {
         self.records.push(record.into());
     }
