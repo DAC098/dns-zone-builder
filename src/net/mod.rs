@@ -3,8 +3,6 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 pub mod error;
 
-use crate::bits;
-
 #[inline]
 pub fn ipv4_to_u32(addr: &Ipv4Addr) -> u32 {
     u32::from_be_bytes(addr.octets())
@@ -23,7 +21,7 @@ pub struct Ipv4AddrCidr {
 impl Ipv4AddrCidr {
 
     pub fn check_cidr(cidr: &u8) -> bool {
-        *cidr < 1 || *cidr > 32
+        *cidr == 0 || *cidr > 32
     }
 
     pub fn new(a: u8, b: u8, c: u8, d: u8, cidr: u8) -> error::Result<Ipv4AddrCidr> {
@@ -74,8 +72,12 @@ impl Ipv4AddrCidr {
         self.cidr
     }
 
+    pub fn cidr_mask(&self) -> u32 {
+        u32::MAX >> self.cidr
+    }
+
     pub fn available_addresses(&self) -> u32 {
-        2u32.pow(32 - (self.cidr as u32))
+        (u32::MAX >> self.cidr) + 1
     }
 
     pub fn as_u32(&self) -> u32 {
@@ -83,9 +85,7 @@ impl Ipv4AddrCidr {
     }
 
     pub fn start_u32(&self) -> u32 {
-        let mut rtn = self.as_u32();
-        bits::flip_off_right_u32(&mut rtn, 32 - self.cidr);
-        rtn
+        self.as_u32() & !(u32::MAX >> self.cidr)
     }
 
     pub fn start(&self) -> Ipv4Addr {
@@ -93,9 +93,7 @@ impl Ipv4AddrCidr {
     }
 
     pub fn finish_u32(&self) -> u32 {
-        let mut rtn = self.as_u32();
-        bits::flip_on_right_u32(&mut rtn, 32 - self.cidr);
-        rtn
+        self.as_u32() | (u32::MAX >> self.cidr)
     }
 
     pub fn finish(&self) -> Ipv4Addr {
@@ -103,12 +101,12 @@ impl Ipv4AddrCidr {
     }
 
     pub fn in_range(&self, check: &Ipv4Addr) -> bool {
-        let avail = self.available_addresses();
         let check_value = ipv4_to_u32(check);
-        let start = self.as_u32() & !(avail - 1);
-        let finish = start | (avail - 1);
+        let value = self.as_u32();
 
-        check_value >= start && check_value <= finish
+        // check_value >= start && check_value <= finish
+        check_value >= (value & !(u32::MAX >> self.cidr)) && 
+        check_value <= (value | (u32::MAX >> self.cidr))
     }
 
     pub fn prefix(&self) -> String {
@@ -132,7 +130,7 @@ pub struct Ipv6AddrCidr {
 impl Ipv6AddrCidr {
 
     pub fn check_cidr(cidr: &u8) -> bool {
-        *cidr < 1 || *cidr > 128
+        *cidr == 0 || *cidr > 128
     }
     
     pub fn new(a: u16, b: u16, c: u16, d: u16, e: u16, f: u16, g: u16, h: u16, cidr: u8) -> error::Result<Ipv6AddrCidr> {
@@ -179,8 +177,12 @@ impl Ipv6AddrCidr {
         self.cidr
     }
 
+    pub fn cidr_mask(&self) -> u128 {
+        u128::MAX >> self.cidr
+    }
+
     pub fn available_addresses(&self) -> u128 {
-        2u128.pow(128 - (self.cidr as u32))
+        (u128::MAX >> self.cidr) + 1
     }
 
     pub fn as_u128(&self) -> u128 {
@@ -188,9 +190,7 @@ impl Ipv6AddrCidr {
     }
 
     pub fn start_u128(&self) -> u128 {
-        let mut rtn = self.as_u128();
-        bits::flip_off_right_u128(&mut rtn, 128 - self.cidr);
-        rtn
+        self.as_u128() & !(u128::MAX >> self.cidr)
     }
 
     pub fn start(&self) -> Ipv6Addr {
@@ -198,9 +198,7 @@ impl Ipv6AddrCidr {
     }
 
     pub fn finish_u128(&self) -> u128 {
-        let mut rtn = self.as_u128();
-        bits::flip_on_right_u128(&mut rtn, 128 - self.cidr);
-        rtn
+        self.as_u128() | (u128::MAX >> self.cidr)
     }
 
     pub fn finish(&self) -> Ipv6Addr {
@@ -208,12 +206,12 @@ impl Ipv6AddrCidr {
     }
 
     pub fn in_range(&self, check: &Ipv6Addr) -> bool {
-        let avail = self.available_addresses();
         let check_value = ipv6_to_u128(check);
-        let start = self.as_u128() & !(avail - 1);
-        let finish = start | (avail - 1);
+        let value = self.as_u128();
 
-        check_value >= start && check_value <= finish
+        // check_value >= start && check_value <= finish
+        check_value >= (value & !(u128::MAX >> self.cidr)) &&
+        check_value <= (value | (u128::MAX >> self.cidr))
     }
 
     pub fn prefix(&self) -> String {

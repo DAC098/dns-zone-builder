@@ -3,7 +3,6 @@ use std::io::prelude::*;
 use lazy_static::lazy_static;
 use regex::{Regex};
 
-mod bits;
 mod error;
 mod net;
 mod dns;
@@ -33,7 +32,7 @@ fn main() {
 
 #[allow(dead_code)]
 fn v4_test() {
-    let test = net::Ipv4AddrCidr::new(154, 40, 43, 205, 8).unwrap();
+    let test = net::Ipv4AddrCidr::new(10, 40, 43, 205, 8).unwrap();
     let avail = test.available_addresses();
     let addr = test.as_u32();
     let start = test.start_u32();
@@ -41,23 +40,22 @@ fn v4_test() {
     println!("{}", test);
     println!("  prefix: {}", test.prefix());
     println!("  addr  : {}", test.addr_ref());
-    println!("  cidr  : {} {}", test.cidr_ref(), *test.cidr_ref() / 8);
+    println!("  cidr  : {}", test.cidr_ref());
     println!("  avail : {}", avail);
     println!("  start : {}", test.start());
     println!("  finish: {}", test.finish());
-    println!("  cidr_mask : {:0>32b}", avail - 1);
+    println!("  cidr_mask : {:0>32b}", test.cidr_mask());
     println!("  addr_bin  : {:0>32b}", addr);
     println!("  start_bin : {:0>32b}", start);
     println!("  finish_bin: {:0>32b}", finish);
     println!("  addr_hex  : {:0>8x}", addr);
     println!("  start_hex : {:0>8x}", start);
     println!("  finish_hex: {:0>8x}", finish);
-    println!("  prefix_dns: {}", dns::ipv4_reverse_prefix(&test, true).unwrap());
 }
 
 #[allow(dead_code)]
 fn v6_test() {
-    let test = net::Ipv6AddrCidr::new(0x28e4, 0xd3e8, 0x6ca1, 0x6c21, 0x14f6, 0xc4a8,0x20a0, 0xc409, 48).unwrap();
+    let test = net::Ipv6AddrCidr::new(0x28e4, 0xd3e8, 0x6ca1, 0x6c21, 0x14f6, 0xc4a8,0x20a0, 0xc409, 64).unwrap();
     let avail = test.available_addresses();
     let addr = test.as_u128();
     let start = test.start_u128();
@@ -65,18 +63,17 @@ fn v6_test() {
     println!("{}", test);
     println!("  prefix: {}", test.prefix());
     println!("  addr  : {}", test.addr_ref());
-    println!("  cidr  : {} {}", test.cidr_ref(), *test.cidr_ref() / 4);
+    println!("  cidr  : {}", test.cidr_ref());
     println!("  avail : {}", avail);
     println!("  start : {}", test.start());
     println!("  finish: {}", test.finish());
-    println!("  cidr_mask : {:0>128b}", avail - 1);
+    println!("  cidr_mask : {:0>128b}", test.cidr_mask());
     println!("  addr_bin  : {:0>128b}", addr);
     println!("  start_bin : {:0>128b}", start);
     println!("  finish_bin: {:0>128b}", finish);
     println!("  addr_hex  : {:0>32x}", addr);
     println!("  start_hex : {:0>32x}", start);
     println!("  finish_hex: {:0>32x}", finish);
-    println!("  prefix_dns: {}", dns::ipv6_reverse_prefix(&test, true).unwrap());
 }
 
 fn app_runner() -> error::Result<i32> {
